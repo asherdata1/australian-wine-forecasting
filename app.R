@@ -7,6 +7,7 @@ options(shiny.autoreload = TRUE)
 
 source("preprocessing.R")
 
+# Keep varietal colors consistent across plots.
 wine_colors <- c(
   "Red" = "#B22222",
   "Rose" = "#E78AA6",
@@ -16,12 +17,13 @@ wine_colors <- c(
   "Fortified" = "#8B5A2B"
 )
 
-# User interface
+# User interface: analysis controls and forecast tabs.
 ui <- fluidPage(
   titlePanel("Australian Wine Sales"),
 
   sidebarLayout(
     sidebarPanel(
+      # Select one or more wine series.
       selectInput(
         "varietals",
         "Select Wine Varietals:",
@@ -29,6 +31,7 @@ ui <- fluidPage(
         selected = "Red",
         multiple = TRUE
       ),
+      # Choose the historical analysis window.
       sliderInput(
         "dates",
         "Select Analysis Period:",
@@ -39,6 +42,7 @@ ui <- fluidPage(
         sep = "",
         width = "100%"
       ),
+      # Set the chronological training percentage.
       sliderInput(
         "train_pct",
         "Training data (%)",
@@ -47,6 +51,7 @@ ui <- fluidPage(
         value = 80,
         step = 5
       ),
+      # Set the number of future months to forecast.
       numericInput(
         "horizon",
         "Forecast horizon (months):",
@@ -56,6 +61,7 @@ ui <- fluidPage(
         step = 1
       ),
       hr(),
+      # Show fitted model forms in the sidebar.
       h3("Training Model Specifications"),
       uiOutput("model_summary_ui")
     ),
@@ -63,6 +69,7 @@ ui <- fluidPage(
       fluidRow(
         column(
           6,
+          # Show or hide forecast model lines.
           checkboxGroupInput(
             "models",
             "Display Forecast Models:",
@@ -73,6 +80,7 @@ ui <- fluidPage(
         ),
         column(
           6,
+          # Toggle future prediction intervals.
           checkboxGroupInput(
             "interval_levels",
             "Prediction Intervals:",
@@ -82,6 +90,7 @@ ui <- fluidPage(
           )
         )
       ),
+      # Adjust the visible forecast plot range.
       sliderInput(
         "plot_zoom",
         "Forecast Zoom Level:",
@@ -92,21 +101,25 @@ ui <- fluidPage(
         width = "100%"
       ),
       tabsetPanel(
+        # Overview of the selected historical series.
         tabPanel(
           "Historical Sales",
           plotOutput("sales_plot")
         ),
 
+        # Held-out forecasts and model accuracy tables.
         tabPanel(
           "Validation Forecasts",
           uiOutput("validation_sections_ui")
         ),
 
+        # Future forecasts from refitted models.
         tabPanel(
           "Future Forecasts",
           uiOutput("future_sections_ui")
         ),
 
+        # Data preparation, methods, and usage notes.
         tabPanel(
           "About",
           h3("About This Application"),
@@ -159,6 +172,7 @@ ui <- fluidPage(
 
 # Server logic
 server <- function(input, output, session) {
+  # Require enough history for seasonal modeling.
   check_history <- function(data) {
     req(nrow(data) > 0)
     validate(need(
@@ -167,6 +181,7 @@ server <- function(input, output, session) {
     ))
   }
 
+  # Apply the selected varietals and year range.
   filtered_data <- reactive({
     wine_ts |>
       filter(
@@ -230,6 +245,7 @@ server <- function(input, output, session) {
       )
   })
 
+  # Calculate in-sample model accuracy.
   training_accuracy <- reactive({
     fitted_models() |>
       accuracy() |>
@@ -245,6 +261,7 @@ server <- function(input, output, session) {
       arrange(Varietal, RMSE)
   })
 
+  # Combine accuracy metrics in long format.
   model_accuracy <- reactive({
     bind_rows(
       training_accuracy() |> mutate(Period = "Training"),
@@ -254,6 +271,7 @@ server <- function(input, output, session) {
     arrange(Varietal, .model, Period)
   })
 
+  # Align training and validation metrics side by side.
   accuracy_comparison <- reactive({
     training_accuracy() |>
       rename(
@@ -273,6 +291,7 @@ server <- function(input, output, session) {
       arrange(Varietal, Valid_RMSE)
   })
 
+  # Forecast the requested number of future months.
   future_forecasts <- reactive({
     future_models() |>
       forecast(h = input$horizon)
@@ -292,6 +311,7 @@ server <- function(input, output, session) {
     months[total_months - months_displayed + 1]
   })
 
+  # Draw the filtered historical sales overview.
   output$sales_plot <- renderPlot({
     filtered_data() |>
       ggplot(aes(x = Month, y = Sales, color = Varietal)) +
@@ -306,6 +326,7 @@ server <- function(input, output, session) {
       theme_minimal()
   })
 
+  # Add sidebar specification tables for selected varietals.
   output$model_summary_ui <- renderUI({
     tagList(
       lapply(input$varietals, function(v) {
@@ -317,6 +338,7 @@ server <- function(input, output, session) {
     )
   })
 
+  # Build each varietal's validation plot and table layout.
   output$validation_sections_ui <- renderUI({
     lapply(input$varietals, function(v) {
       tagList(
@@ -338,6 +360,7 @@ server <- function(input, output, session) {
     })
   })
 
+  # Build each varietal's future plot and accuracy layout.
   output$future_sections_ui <- renderUI({
     tagList(
       p(
@@ -372,6 +395,7 @@ server <- function(input, output, session) {
       local({
         varietal <- v
 
+        # Overlay actual sales, validation predictions, and split boundary.
         output[[paste0("validation_plot_", make.names(varietal))]] <- renderPlot({
 
           actual <- filtered_data() |>
@@ -423,6 +447,7 @@ server <- function(input, output, session) {
             theme_minimal()
         })
 
+        # Display training and validation metrics for this varietal.
         output[[paste0("accuracy_", make.names(varietal))]] <- renderTable({
           accuracy_comparison() |>
             filter(Varietal == varietal) |>
@@ -446,6 +471,7 @@ server <- function(input, output, session) {
       local({
         varietal <- v
 
+        # Format model specifications as readable table entries.
         output[[paste0("model_", make.names(varietal))]] <- renderTable({
           fitted_models() |>
             filter(Varietal == varietal) |>
@@ -468,6 +494,7 @@ server <- function(input, output, session) {
       local({
         varietal <- v
 
+        # Plot future predictions alongside historical sales.
         output[[paste0("future_plot_", make.names(varietal))]] <- renderPlot({
 
           actual <- filtered_data() |>
@@ -479,6 +506,7 @@ server <- function(input, output, session) {
               .model %in% input$models
             )
 
+          # Extract the 80% and 95% interval bounds.
           intervals <- if (nrow(predictions) > 0) {
             predictions |>
               hilo(level = c(80, 95)) |>
@@ -562,6 +590,7 @@ server <- function(input, output, session) {
             theme_minimal()
         })
 
+        # Repeat historical accuracy beneath the future forecast.
         output[[paste0("future_accuracy_", make.names(varietal))]] <- renderTable({
           accuracy_comparison() |>
             filter(Varietal == varietal) |>
