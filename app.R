@@ -38,7 +38,6 @@ ui <- fluidPage(
         sep = "",
         width = "100%"
       ),
-      textOutput("selected_dates"),
       sliderInput(
         "train_pct",
         "Training data (%)",
@@ -56,7 +55,7 @@ ui <- fluidPage(
         step = 1
       ),
       hr(),
-      h3("Model Specifications"),
+      h3("Training Model Specifications"),
       uiOutput("model_summary_ui")
     ),
     mainPanel(
@@ -115,6 +114,13 @@ ui <- fluidPage(
             "from January 1980 through December 1994 across six wine varietals."
           ),
 
+          h4("Missing Data"),
+          p(
+            "Rose sales for July and August 1994 are estimated from June 1994 ",
+            "using median July/June and August/June ratios from 1989–1993. ",
+            "Rose validation metrics may therefore include estimated observations."
+          ),
+
           h4("Forecasting Methods"),
           p(
             "Three forecasting approaches are compared: time series linear ",
@@ -128,6 +134,8 @@ ui <- fluidPage(
             "Models are trained using a chronological split of the selected ",
             "analysis period. Performance is evaluated using RMSE, MAE, ",
             "and MAPE on both training and validation observations. ",
+            "The dashed line marks the start of validation. Sidebar specifications ",
+            "describe the training models. ",
             "Future forecasts are generated using models refitted on ",
             "the full selected period."
           ),
@@ -150,6 +158,14 @@ ui <- fluidPage(
 
 # Server logic
 server <- function(input, output, session) {
+  check_history <- function(data) {
+    req(nrow(data) > 0)
+    validate(need(
+      n_distinct(data$Month) >= 24,
+      "At least 24 months are needed for modeling. Extend the analysis period or increase the training percentage."
+    ))
+  }
+
   filtered_data <- reactive({
     wine_ts |>
       filter(
@@ -159,6 +175,7 @@ server <- function(input, output, session) {
       )
   })
 
+  # Split each series chronologically.
   split_data <- reactive({
     filtered_data() |>
     group_by_key() |>
@@ -181,7 +198,9 @@ server <- function(input, output, session) {
       select(Month, Varietal, Sales)
   })
 
+  # Fit models on the training window.
   fitted_models <- reactive({
+    check_history(training_data())
     training_data() |>
       model(
         TSLM = TSLM(Sales ~ trend() + season()),
@@ -190,7 +209,9 @@ server <- function(input, output, session) {
       )
   })
 
+  # Refit models on the full selected period.
   future_models <- reactive({
+    check_history(filtered_data())
     filtered_data() |>
       model(
         TSLM = TSLM(Sales ~ trend() + season()),
@@ -199,6 +220,7 @@ server <- function(input, output, session) {
       )
   })
 
+  # Forecast the held-out validation months.
   validation_forecasts <- reactive({
     fitted_models() |>
       forecast(
@@ -214,6 +236,7 @@ server <- function(input, output, session) {
       arrange(Varietal, RMSE)
   })
 
+  # Score forecasts against validation observations.
   validation_accuracy <- reactive({
     validation_forecasts() |>
       accuracy(validation_data()) |>
@@ -254,6 +277,7 @@ server <- function(input, output, session) {
       forecast(h = input$horizon)
   })
 
+  # Zoom the plots without changing model inputs.
   zoom_start <- reactive({
     months <- sort(unique(filtered_data()$Month))
 
@@ -341,6 +365,7 @@ server <- function(input, output, session) {
     )
   })
 
+  # Create validation plots and tables for each varietal.
   observe({
     lapply(input$varietals, function(v) {
       local({
@@ -360,8 +385,12 @@ server <- function(input, output, session) {
           ggplot() +
             geom_line(
               data = actual,
-              aes(x = Month, y = Sales),
-              color = "gray40"
+              aes(x = Month, y = Sales, color = "Actual")
+            ) +
+            geom_vline(
+              data = tibble(Month = min(validation_data()$Month)),
+              aes(xintercept = Month),
+              linetype = "dashed", color = "gray60"
             ) +
             geom_line(
               data = predictions,
@@ -370,6 +399,7 @@ server <- function(input, output, session) {
             ) +
             scale_color_manual(
               values = c(
+                "Actual" = "gray40",
                 "TSLM" = "#2563EB",
                 "ETS" = "#0D9488",
                 "ARIMA" = "#C026D3"
@@ -379,7 +409,7 @@ server <- function(input, output, session) {
               title = paste(varietal, "— Validation Forecast"),
               x = "Month",
               y = "Sales",
-              color = "Forecast Model"
+              color = "Series"
             ) +
             {
               coord_cartesian(
@@ -409,6 +439,7 @@ server <- function(input, output, session) {
     })
   })
 
+  # Display training-model specifications for each varietal.
   observe({
     lapply(input$varietals, function(v) {
       local({
@@ -430,6 +461,7 @@ server <- function(input, output, session) {
     })
   })
 
+  # Create future plots and tables for each varietal.
   observe({
     lapply(input$varietals, function(v) {
       local({
@@ -457,8 +489,7 @@ server <- function(input, output, session) {
           ggplot() +
             geom_line(
               data = actual,
-              aes(x = Month, y = Sales),
-              color = "gray40"
+              aes(x = Month, y = Sales, color = "Actual")
             ) +
             {
               if (!is.null(intervals) && "95" %in% input$interval_levels) {
@@ -497,6 +528,7 @@ server <- function(input, output, session) {
             ) +
             scale_color_manual(
               values = c(
+                "Actual" = "gray40",
                 "TSLM" = "#2563EB",
                 "ETS" = "#0D9488",
                 "ARIMA" = "#C026D3"
@@ -514,7 +546,7 @@ server <- function(input, output, session) {
               title = paste(varietal, "— Future Sales Forecast"),
               x = "Month",
               y = "Sales",
-              color = "Forecast Model"
+              color = "Series"
             ) +
             {
               if (!is.null(zoom_start())) {

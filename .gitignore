@@ -1,0 +1,17 @@
+# R session files
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+
+# R environment and package libraries
+.Renviron
+renv/library/
+renv/staging/
+
+# macOS files
+.DS_Store
+
+# Quarto-generated files
+.quarto/
+*_files/

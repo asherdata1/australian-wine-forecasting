@@ -1,5 +1,3 @@
-
-
 # Load Australian wine sales data
 wine_raw <- read_csv("AustralianWines.csv", show_col_types = FALSE)
 
