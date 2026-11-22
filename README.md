@@ -4,7 +4,7 @@ An interactive R Shiny application for exploring monthly Australian wine sales a
 
 Developed by Asher Frank for **ADS-506: Applied Time Series Analysis**, University of San Diego.
 
-**Live app:** Deployment pending.
+**Live app:** [Launch Australian Wine Sales](https://01a2014b-52c7-e2a8-4f8e-f1bbeafcbe66.share.connect.posit.cloud/)
 
 ## Overview
 
@@ -36,7 +36,7 @@ The application analyzes monthly Australian wine sales from January 1980 through
 - `AustralianWines.csv` — Dataset supplied with the course assignment.
 - `manifest.json` — Connect Cloud deployment metadata and package dependencies.
 
-Keep all three files in the same directory. Run the app from that directory so its relative file paths resolve correctly.
+Keep `app.R`, `preprocessing.R`, and `AustralianWines.csv` in the same directory. Run the app from that directory so its relative file paths resolve correctly.
 
 ## Running the Application
 
