@@ -1,6 +1,7 @@
 library(shiny)
 library(fpp3)
 library(readr)
+library(urca) # Required for automatic ARIMA differencing.
 
 options(shiny.autoreload = TRUE)
 

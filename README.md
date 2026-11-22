@@ -43,7 +43,7 @@ Keep all three files in the same directory. Run the app from that directory so i
 1. Install R, then install the required packages:
 
    ```r
-   install.packages(c("shiny", "fpp3", "readr"))
+   install.packages(c("shiny", "fpp3", "readr", "urca"))
    ```
 
 2. Clone or download this repository and open its directory in RStudio or another R environment.
@@ -102,8 +102,9 @@ Verified locally on November 21, 2026, on macOS (Apple silicon):
 | shiny | 1.14.0 |
 | fpp3 | 1.0.3 |
 | readr | 2.2.0 |
+| urca | 1.3.4 |
 
-These are the R version and three packages directly loaded by the app. Installing these packages also installs their dependencies.
+These are the R version and four packages directly loaded by the app. `urca` is required for automatic ARIMA differencing and is included explicitly for deployment. Installing these packages also installs their dependencies.
 
 ## AI Assistance
 
